@@ -1,0 +1,24 @@
+apiVersion: v2
+name: ml-cicd-predictor
+description: A Helm chart for ML-based CI/CD failure prediction service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ml
+  - cicd
+  - prediction
+  - devops
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com
+home: https://github.com/practicalClerk/Devops_Project
+sources:
+  - https://github.com/practicalClerk/Devops_Project
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.svg
+annotations:
+  artifacthub.io/category: machine-learning
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: source
+      url: https://github.com/practicalClerk/Devops_Project

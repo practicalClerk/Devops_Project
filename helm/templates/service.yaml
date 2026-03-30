@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ml-cicd-predictor.fullname" . }}
+  labels:
+    {{- include "ml-cicd-predictor.labels" . | nindent 4 }}
+  {{- if .Values.metrics.enabled }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ .Values.service.targetPort }}"
+    prometheus.io/path: "/metrics"
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.service.targetPort }}
+    targetPort: http
+    protocol: TCP
+    name: http-direct
+  selector:
+    {{- include "ml-cicd-predictor.selectorLabels" . | nindent 4 }}
