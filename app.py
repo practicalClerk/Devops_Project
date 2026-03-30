@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import logging
+import json
+import os
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -16,6 +18,8 @@ app = Flask(__name__)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+PREDICTION_LOG_FILE = "predictions_log.json"
 
 # Load pre-trained model and preprocessing objects
 try:
@@ -55,6 +59,25 @@ def encode_time_of_commit(value):
 
     # Fallback for pipelines trained directly on numeric hour.
     return hour
+
+
+def append_prediction_log(entry):
+    """Append a prediction entry to the JSON log file in the project root."""
+    log_data = []
+
+    if os.path.exists(PREDICTION_LOG_FILE):
+        try:
+            with open(PREDICTION_LOG_FILE, 'r', encoding='utf-8') as f:
+                existing = json.load(f)
+                if isinstance(existing, list):
+                    log_data = existing
+        except Exception as e:
+            logger.warning(f"Could not read existing prediction log. Starting a new file: {e}")
+
+    log_data.append(entry)
+
+    with open(PREDICTION_LOG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(log_data, f, indent=2)
 
 # ============ HEALTH CHECK ============
 @app.route('/health', methods=['GET'])
@@ -148,6 +171,16 @@ def predict():
             "recommendation": "🔴 STOP PIPELINE" if prediction == 1 else "🟢 CONTINUE PIPELINE",
             "timestamp": datetime.now().isoformat()
         }
+
+        try:
+            append_prediction_log({
+                "endpoint": "/predict",
+                "timestamp": response["timestamp"],
+                "input": data,
+                "output": response
+            })
+        except Exception as e:
+            logger.warning(f"Prediction generated but failed to write JSON log: {e}")
         
         logger.info(f"Prediction: {prediction_label} (risk: {risk_level}, prob: {failure_prob:.4f})")
         return jsonify(response), 200
@@ -197,6 +230,16 @@ def predict_batch():
                 "prediction": "FAIL" if prediction == 1 else "PASS",
                 "failure_probability": round(probability[1], 4)
             })
+
+        try:
+            append_prediction_log({
+                "endpoint": "/predict-batch",
+                "timestamp": datetime.now().isoformat(),
+                "input": data,
+                "output": {"predictions": results}
+            })
+        except Exception as e:
+            logger.warning(f"Batch prediction generated but failed to write JSON log: {e}")
         
         return jsonify({"predictions": results}), 200
         
@@ -216,6 +259,24 @@ def features():
             "features": feature_names,
             "importance": importance_dict
         }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/predictions-log', methods=['GET'])
+def predictions_log():
+    """Read stored predictions from JSON log file."""
+    try:
+        if not os.path.exists(PREDICTION_LOG_FILE):
+            return jsonify({"entries": [], "count": 0}), 200
+
+        with open(PREDICTION_LOG_FILE, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+
+        if not isinstance(entries, list):
+            entries = []
+
+        return jsonify({"entries": entries, "count": len(entries)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
