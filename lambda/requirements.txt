@@ -1,0 +1,8 @@
+# AWS Lambda requirements
+# Build Lambda package with: pip install -r requirements.txt -t package/
+
+scikit-learn>=1.8,<2
+pandas>=3.0,<4
+numpy>=2.4,<3
+joblib>=1.5,<2
+boto3>=1.34,<2
