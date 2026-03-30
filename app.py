@@ -34,6 +34,9 @@ groq_client = Groq()
 # Initialize Redis cache
 from redis_cache import get_cache
 cache = get_cache()
+
+# Initialize Prometheus metrics
+from prometheus_metrics import MetricsCollector, init_flask_metrics
  
 # Load pre-trained model and preprocessing objects
 try:
@@ -144,10 +147,14 @@ def predict():
         # Check cache first
         cached_result = cache.get(data)
         if cached_result:
+            MetricsCollector.record_cache_hit()
             cached_result["cached"] = True
             cached_result["timestamp"] = datetime.now().isoformat()
             logger.info(f"Returning cached prediction: {cached_result.get('prediction')}")
             return jsonify(cached_result), 200
+
+        # Record cache miss
+        MetricsCollector.record_cache_miss()
 
         input_data = []
         for feature in feature_names:
@@ -174,7 +181,16 @@ def predict():
  
         prediction_label = "FAIL" if prediction == 1 else "PASS"
         confidence = max(probability)
- 
+
+        # Record metrics
+        MetricsCollector.record_prediction(
+            outcome=prediction_label,
+            risk_level=risk_level,
+            failure_prob=failure_prob,
+            confidence=confidence
+        )
+        MetricsCollector.record_input_features(data)
+
         response = {
             "prediction": prediction_label,
             "risk_level": risk_level,
@@ -407,6 +423,9 @@ def internal_error(error):
  
 if __name__ == '__main__':
     if model is not None:
+        # Initialize Prometheus metrics
+        init_flask_metrics(app)
+
         print("\n" + "=" * 60)
         print("🚀 CI/CD Failure Prediction API")
         print("=" * 60)
@@ -418,9 +437,12 @@ if __name__ == '__main__':
         print("  GET  /health           - Health check")
         print("  GET  /features         - Feature importance")
         print("  GET  /predictions-log  - View prediction history")
+        print("  GET  /metrics          - Prometheus metrics")
+        print("  GET  /cache-stats      - Redis cache statistics")
+        print("  POST /cache-clear      - Clear prediction cache")
         print("\nStarting server on http://0.0.0.0:5000")
         print("=" * 60 + "\n")
- 
+
         app.run(host='0.0.0.0', port=5000, debug=False)
     else:
         print("❌ Model failed to load. Cannot start API.")
